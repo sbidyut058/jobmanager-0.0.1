@@ -9,7 +9,7 @@ try {
             const service = await import(serviceModule);
             if (!service) throw new JobError(404, 'Service Not Found');
 
-            const instance = service.default ? new service.default() : service;
+            const instance = service.default ? service.default : service;
             const fn = instance[method];
             if (!fn) throw new JobError(404, 'Function Not Found');
             const response = await fn.call(instance, payload, (data) => parentPort.postMessage({

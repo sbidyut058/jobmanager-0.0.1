@@ -6,7 +6,7 @@ class BaseObject {
 
     // Initial validation
     for (const [key, value] of Object.entries(parameters)) {
-      const newValue = value !== undefined ? value : type?.[key]?.defaultValue ?? null; 
+      const newValue = value !== undefined ? value : type?.[key]?.defaultValue ?? null;
       validateProperty(key, newValue, type);
       target[key] = value;
     }
@@ -32,7 +32,7 @@ function validateProperty(prop, value, schema) {
   const rule = schema[prop];
   if (!rule) throw new Error(`Property '${prop}' is not allowed`);
 
-  
+
   const { type, instance, nullable } = typeof rule === "string" ? { type: rule, nullable: true } : rule;
   if (value === null) {
     if (!nullable) throw new Error(`'${prop}' cannot be null`);
@@ -44,16 +44,22 @@ function validateProperty(prop, value, schema) {
       `Invalid type for '${prop}', expected ${type}, got ${typeof value}`
     );
   }
-  if((instance && !(value instanceof instance))){
+  if ((instance && !(value instanceof instance))) {
     throw new Error(
-      `Invalid instance passed for '${prop}', expected ${ instance.prototype.name }`
+      `Invalid instance passed for '${prop}', expected ${instance.prototype.name}`
+    );
+  }
+  if (rule.enum) {
+    if (!Array.isArray(rule.enum)) throw new Error(`Invalid Enum defined`);
+    if (!rule.enum.includes(value)) throw new Error(
+      `Invalid value passed for '${prop}', expected ${rule.enum.entries(i => i)}`
     );
   }
 }
 
 // Patch Object.assign for BaseObject
 const nativeAssign = Object.assign;
-Object.assign = function(target, ...sources) {
+Object.assign = function (target, ...sources) {
   if (schemaMap.has(target)) {
     const schema = schemaMap.get(target);
 
