@@ -1,32 +1,59 @@
 import { Worker } from 'worker_threads';
 import { Job as ScheduleJob } from 'node-schedule';
 import ApiResponseEntity from "./ApiResponseEntity.js";
+import BaseObject from './BaseObject.js';
 
 /**
  * @typedef {"thread" | "scheduler"} JobType
  */
 
 /**
- * Represents a generic Job, can be a Worker thread or a scheduled job.
- * @class
+ * @typedef {Object} JobProps
+ * @property {JobType} type - Type of job ("thread" or "scheduler")
+ * @property {string} [parentId] - Optional parent job ID
+ * @property {string} title - Job title
+ * @property {string} [description] - Optional description
+ * @property {ApiResponseEntity} [response] - Response object for job result
+ * @property {Worker|ScheduleJob} [executor] - Worker thread or scheduler job
  */
-class Job {
+
+/**
+ * 
+ * @class Represents a generic Job (thread or scheduled job).
+ * @extends {BaseObject}
+ */
+class Job extends BaseObject {
+
+  /** @type {"thread" | "scheduler"} */
+  type;
+
+  /** @type {string | null} */
+  parentId;
+
+  /** @type {string} */
+  title;
+
+  /** @type {string | null} */
+  description;
+
+  /** @type {ApiResponseEntity | null} */
+  response;
+
+  /** @type {Worker | ScheduleJob | null} */
+  executor;
+
   /**
-   * @param {Object} props
-   * @param {JobType} props.type - Type of job ("thread" or "scheduler")
-   * @param {string} [props.parentId] - Optional parent job ID
-   * @param {string} props.title - Job title
-   * @param {string} [props.description] - Optional description
-   * @param {ApiResponseEntity} [props.response] - Response object for job result
-   * @param {Worker|ScheduleJob} [props.executor] - Either a Worker thread or node-schedule Job instance
+   * @param {JobProps} props
    */
-  constructor({ type, parentId, title, description, response, executor }) {
-    this.type = type;
-    this.parentId = parentId;
-    this.title = title,
-    this.description = description,
-    this.response = response,
-    this.executor = executor;
+  constructor(props) {
+    super(props, {
+      type: { type: "string", validValues: ["thread", "scheduler"], nullable: false },
+      parentId: { type: "string", nullable: true },
+      title: { type: "string", nullable: false },
+      description: { type: "string", nullable: true },
+      response: { type: "object", instance: ApiResponseEntity, nullable: true },
+      executor: { type: "object", instance: [Worker, ScheduleJob], nullable: true }
+    });
   }
 }
 

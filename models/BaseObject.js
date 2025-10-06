@@ -1,84 +1,87 @@
-const schemaMap = new WeakMap();
+/**
+ * @typedef {Object<string, { type: string, defaultValue?: any, instance?: Function|Function[], validValues?: any[], nullable?: boolean }>} SchemaType
+ */
 
 class BaseObject {
-  constructor(parameters, type) {
-    const target = {};
+  #schema;
 
-    // Initial validation
-    for (const [key, value] of Object.entries(parameters)) {
-      const newValue = value !== undefined ? value : type?.[key]?.defaultValue ?? null;
-      validateProperty(key, newValue, type);
-      target[key] = value;
+  /**
+   * Creates a validated DTO object.
+   * @param {Object<string, any>} parameters - Key-value pairs for the object
+   * @param {SchemaType} schema - Schema definition for validation
+   */
+  constructor(parameters = {}, schema) {
+    this.#schema = schema;
+
+    for (const [key, rule] of Object.entries(schema)) {
+      const value = parameters[key] !== undefined
+        ? parameters[key]
+        : rule?.defaultValue ?? null;
+
+      this.#validateProperty(key, value);
+
+      // private backing field
+      this[`#${key}`] = value;
+
+      // define getter/setter for public access
+      Object.defineProperty(this, key, {
+        get: () => this[`#${key}`],
+        set: (val) => {
+          this.#validateProperty(key, val);
+          this[`#${key}`] = val;
+        },
+        enumerable: true,
+        configurable: true,
+      });
+    }
+  }
+
+  /**
+   * Validates a property value against the schema
+   * @param {string} prop
+   * @param {any} value
+   */
+  #validateProperty(prop, value) {
+    const rule = this.#schema[prop];
+    if (!rule) throw new Error(`Property '${prop}' is not allowed`);
+
+    const { type, instance, validValues, nullable } = typeof rule === "string"
+      ? { type: rule, nullable: true }
+      : rule;
+
+    if (value === null) {
+      if (!nullable) throw new Error(`'${prop}' cannot be null`);
+      return;
     }
 
-    schemaMap.set(target, type);
+    if (!this.#isTypeMatch(value, type)) {
+      throw new Error(`Invalid type for '${prop}', expected '${type}', got '${typeof value}'`);
+    }
 
-    return new Proxy(target, {
-      get(target, prop) {
-        return target[prop];
-      },
-      set(target, prop, value) {
-        const schema = schemaMap.get(target);
-        validateProperty(prop, value, schema);
-        target[prop] = value;
-        return true;
-      },
-    });
-  }
-}
-
-// Validation helper
-function validateProperty(prop, value, schema) {
-  const rule = schema[prop];
-  if (!rule) throw new Error(`Property '${prop}' is not allowed`);
-
-
-  const { type, instance, nullable } = typeof rule === "string" ? { type: rule, nullable: true } : rule;
-  if (value === null) {
-    if (!nullable) throw new Error(`'${prop}' cannot be null`);
-    return;
-  }
-
-  if (typeof value !== type && type !== 'any') {
-    throw new Error(
-      `Invalid type for '${prop}', expected ${type}, got ${typeof value}`
-    );
-  }
-  if ((instance && !(value instanceof instance))) {
-    throw new Error(
-      `Invalid instance passed for '${prop}', expected ${instance.prototype.name}`
-    );
-  }
-  if (rule.enum) {
-    if (!Array.isArray(rule.enum)) throw new Error(`Invalid Enum defined`);
-    if (!rule.enum.includes(value)) throw new Error(
-      `Invalid value passed for '${prop}', expected ${rule.enum.entries(i => i)}`
-    );
-  }
-}
-
-// Patch Object.assign for BaseObject
-const nativeAssign = Object.assign;
-Object.assign = function (target, ...sources) {
-  if (schemaMap.has(target)) {
-    const schema = schemaMap.get(target);
-
-    // Validate all properties in all sources first
-    for (const source of sources) {
-      for (const [key, value] of Object.entries(source)) {
-        validateProperty(key, value, schema);
+    if (instance) {
+      const instances = Array.isArray(instance) ? instance : [instance];
+      if (!instances.some(ins => value instanceof ins)) {
+        throw new Error(`Invalid instance for '${prop}', expected one of: ${instances.map(i => i.name).join(', ')}`);
       }
     }
 
-    // All valid → assign
-    for (const source of sources) {
-      nativeAssign(target, source);
+    if (validValues && !validValues.includes(value)) {
+      throw new Error(`Invalid value for '${prop}', expected one of: ${validValues.join(', ')}`);
     }
-    return target;
   }
 
-  // fallback for normal objects
-  return nativeAssign(target, ...sources);
-};
+  /**
+   * Checks type match, supports 'any', 'array', and 'date' (valid date string)
+   * @param {any} value
+   * @param {string} type
+   * @returns {boolean}
+   */
+  #isTypeMatch(value, type) {
+    if (type === "any") return true;
+    if (type === "array") return Array.isArray(value);
+    if (type === "date") return typeof value === "string" && !isNaN(Date.parse(value));
+    return typeof value === type;
+  }
+}
 
 export default BaseObject;

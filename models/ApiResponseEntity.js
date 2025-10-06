@@ -1,30 +1,43 @@
+import BaseObject from "./BaseObject.js";
+
 /**
- * Represents a Api Response.
+ *
+ * @typedef {Object} ApiResponseProps
+ * @property {number} status - Status of the response.
+ * @property {string} [message] - Optional response message.
+ * @property {Object} [headers] - Optional response headers.
+ * @property {any} [data] - Optional response data.
  */
 
 /**
+ * Represents an API Response.
  * @class
+ * @extends {BaseObject}
  */
-class ApiResponseEntity {
+class ApiResponseEntity extends BaseObject {
+  /** @type {number} */
+  status;
 
-    /**
-     * @param {Object} props
-   * @param {number} props.status - Status of the response
-   * @param {string} [props.message] - Optional Response message
-   * @param {Object} [props.headers] - Optional response headers
-   * @param {any} [props.data] - Optional Response data
+  /** @type {string | null} */
+  message;
+
+  /** @type {Object | null} */
+  headers;
+
+  /** @type {any | null} */
+  data;
+
+  /**
+   * @param {ApiResponseProps} props - API response properties.
    */
-    constructor({
-        status,
-        message,
-        headers,
-        data
-    }) {
-        this.status = status;
-        this.message = message;
-        this.headers = headers;
-        this.data = data
-    }
+  constructor(props) {
+    super(props, {
+      status: "number",
+      message: { type: "string", nullable: true },
+      headers: { type: "object", instance: Object, nullable: true },
+      data: "any",
+    });
+  }
 }
 
 export default ApiResponseEntity;
