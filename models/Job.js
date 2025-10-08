@@ -24,24 +24,6 @@ import BaseObject from './BaseObject.js';
  */
 class Job extends BaseObject {
 
-  /** @type {"thread" | "scheduler"} */
-  type;
-
-  /** @type {string | null} */
-  parentId;
-
-  /** @type {string} */
-  title;
-
-  /** @type {string | null} */
-  description;
-
-  /** @type {ApiResponseEntity | null} */
-  response;
-
-  /** @type {Worker | ScheduleJob | null} */
-  executor;
-
   /**
    * @param {JobProps} props
    */
@@ -54,6 +36,24 @@ class Job extends BaseObject {
       response: { type: "object", instance: ApiResponseEntity, nullable: true },
       executor: { type: "object", instance: [Worker, ScheduleJob], nullable: true }
     });
+
+    /** @type {"thread" | "scheduler"} */
+    this.type;
+
+    /** @type {string | null} */
+    this.parentId;
+
+    /** @type {string} */
+    this.title;
+
+    /** @type {string | null} */
+    this.description;
+
+    /** @type {ApiResponseEntity | null} */
+    this.response;
+
+    /** @type {Worker | ScheduleJob | null} */
+    this.executor;
   }
 }
 

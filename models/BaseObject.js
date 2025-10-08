@@ -4,6 +4,7 @@
 
 class BaseObject {
   #schema;
+  #data = {};
 
   /**
    * Creates a validated DTO object.
@@ -20,15 +21,15 @@ class BaseObject {
 
       this.#validateProperty(key, value);
 
-      // private backing field
-      this[`#${key}`] = value;
+      // store value in private backing data object
+      this.#data[key] = value;
 
       // define getter/setter for public access
       Object.defineProperty(this, key, {
-        get: () => this[`#${key}`],
+        get: () => this.#data[key],
         set: (val) => {
           this.#validateProperty(key, val);
-          this[`#${key}`] = val;
+          this.#data[key] = val;
         },
         enumerable: true,
         configurable: true,

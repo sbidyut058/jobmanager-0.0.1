@@ -7,5 +7,6 @@ const jobController = new JobController();
 routes.get('/get', utils.asyncHandler(jobController.getJob));
 routes.get('/getall', utils.asyncHandler(jobController.getAllJobs))
 routes.post('/cancel', utils.asyncHandler(jobController.cancelJob));
+routes.get('/getResponse', utils.asyncHandler(jobController.getJobResponse))
 
 export default routes;

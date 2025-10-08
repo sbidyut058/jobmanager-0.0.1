@@ -11,8 +11,8 @@ const asyncHandler = (fn) => (req, res, next) => Promise.resolve(fn(req, res, ne
  */
 const processResponseEntity = (res, entity) => {
     if (entity.headers) {
-        Object.keys(entity).forEach(key => {
-            res.setHeader(key, entity[key]);
+        Object.keys(entity.headers).forEach(key => {
+            res.setHeader(key, entity.headers[key]);
         });
     }
 

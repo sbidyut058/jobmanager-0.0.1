@@ -15,18 +15,7 @@ import BaseObject from "./BaseObject.js";
  * @extends {BaseObject}
  */
 class ApiResponseEntity extends BaseObject {
-  /** @type {number} */
-  status;
-
-  /** @type {string | null} */
-  message;
-
-  /** @type {Object | null} */
-  headers;
-
-  /** @type {any | null} */
-  data;
-
+  
   /**
    * @param {ApiResponseProps} props - API response properties.
    */
@@ -37,6 +26,18 @@ class ApiResponseEntity extends BaseObject {
       headers: { type: "object", instance: Object, nullable: true },
       data: "any",
     });
+
+    /** @type {number} */
+    this.status;
+
+    /** @type {string | null} */
+    this.message;
+
+    /** @type {Object | null} */
+    this.headers;
+
+    /** @type {any | null} */
+    this.data;
   }
 }
 

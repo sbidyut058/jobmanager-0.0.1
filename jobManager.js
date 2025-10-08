@@ -1,172 +1,236 @@
 import { Worker } from 'worker_threads';
+import os from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import Job from "./models/Job.js";
-import ApiResponseEntity from "./models/ApiResponseEntity.js";
-import JobError from './exception/JobError.js';
 import { scheduleJob } from 'node-schedule';
+import Job from './models/Job.js';
+import ApiResponseEntity from './models/ApiResponseEntity.js';
+import JobError from './exception/JobError.js';
 import utils from './utils/utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
 const workerPath = path.resolve(__dirname, './worker.js');
 
-/**
- * Map of jobId -> Job object
- * @type {Map<string, Job>}
- */
+/** Map of jobId -> Job 
+ * @type {Map<number, Job>}
+*/
 const jobMap = new Map();
 
-/**
- * @typedef {Object} cronExpObj
- * @property {number|string} minute - Minute field (0–59 or "*" for every minute)
- * @property {number|string} hour - Hour field (0–23 or "*" for every hour)
- * @property {number|string} dayOfMonth - Day of month (1–31 or "*" for every day)
- * @property {number|string} month - Month field (1–12 or "*" for every month)
- * @property {number|string} dayOfWeek - Day of week (0–6 or "*" for every day; 0 = Sunday)
+/** Queue for pending thread jobs */
+const jobQueue = [];
+
+/** Max workers = number of CPU cores
+ * @type {number}
  */
+const MAX_WORKERS = os.cpus().length;
+
+/** Currently running worker count
+ * @type {number}
+ */
+let activeWorkers = 0;
+
+/** Run next thread job from queue */
+const runNextJobFromQueue = async () => {
+    if (activeWorkers >= MAX_WORKERS || jobQueue.length === 0) return;
+
+    const nextJob = jobQueue.shift();
+    activeWorkers++;
+
+    const { jobid, serviceModule, method, payload, title } = nextJob;
+
+    const worker = new Worker(workerPath, {
+        workerData: { serviceModule, jobid, method, payload: JSON.parse(JSON.stringify(payload)) }
+    });
+
+    nextJob.job.executor = worker;
+
+    worker.on('message', (msg) => {
+        const job = jobMap.get(msg.jobid);
+        Object.assign(job.response, msg.msg);
+    });
+
+    worker.on('error', (error) => console.error(`Worker Error [${title}]:`, error));
+
+    worker.on('exit', (code) => {
+        console.log(`Worker Exit [${title}] Code:`, code);
+        activeWorkers--;
+        runNextJobFromQueue(); // start next job in queue
+    });
+};
 
 /**
- * @typedef {Object} createJobProps
- * @property {import('./models/Job.js').JobType} type - Type of job ("thread" or "scheduler") 
- * @property {string} serviceModule - Path of the service file where job method exists.
- * @property {string} method - The Name of the function that contains the job logic.
- * @property {object} payload - Payload for the method.
- * @property {string} title - Job Title
- * @property {string} description - Short description of the job
- * @property {string} [parentId] - Optional Job Reference Id.
- * @property {cronExpObj} [cronExp] - Only for Scheduler Job
- */
-
-/**
- * Creates a new job and schedules it for execution.
- * @param {createJobProps} props 
- * @returns {Promise<string>} jobid - Resolves with a unique job ID.
+ * Create a job (thread or scheduler)
+ * @param {Object} props
+ * @param {'thread'|'scheduler'} props.type
+ * @param {string} props.serviceModule
+ * @param {string} props.method
+ * @param {object} props.payload
+ * @param {string} props.title
+ * @param {string} [props.description]
+ * @param {string} [props.parentId]
+ * @param {Object} [props.cronExp] - Only for scheduler
+ * @returns {Promise<string>} jobid
  */
 const createJob = async (props) => {
     const { type, serviceModule, method, payload, title, description, parentId, cronExp } = props;
 
     const service = await import(serviceModule);
-    if (!service) throw new JobError(404, 'Service Not Found');
+    if (!service) throw new JobError(404, 'Service not found');
 
-    const jobid = String(Date.now());
-    if (parentId && !jobMap.has(parentId)) throw new JobError(404, `No Job exist with provided parent id ${parentId}`);
+    const jobid = Date.now();
+    if (parentId && !jobMap.has(parentId)) throw new JobError(404, `Parent job with id ${parentId} not found`);
 
-    //Created Temporary Job instance
-    let job = new Job({ title, type, description, parentId, response: new ApiResponseEntity({ status: 202, message: 'Job is in progress' }) });
+    if (Array.from(jobMap.values()).some(job => job.title === title && job.type === 'scheduler')) throw new JobError(409, `Scheduler is already running`);
 
-    if (job.type === 'thread') {
-        const worker = new Worker(workerPath, {
-            workerData: { serviceModule: serviceModule, jobid, method, payload: JSON.parse(JSON.stringify(payload)) }
-        });
+    const job = new Job({
+        title,
+        type,
+        description,
+        parentId,
+        response: new ApiResponseEntity({ status: 202, message: 'Job is in Queue' })
+    });
 
-        job.executor = worker;
-        worker.on("message", (msg) => {
-            const job = jobMap.get(msg.jobid);
-            Object.assign(job.response, msg.msg);
-        });
-
-        worker.on('error', (error) => {
-            console.error(error);
-        })
-
-        worker.on('exit', (code) => {
-            console.log('Exit Code:', code);
-        })
-    } else if (job.type === 'scheduler') {
+    if (type === 'thread') {
+        const jobData = { jobid, serviceModule, method, payload, title, job };
+        if (activeWorkers < MAX_WORKERS) {
+            jobQueue.unshift(jobData);
+            runNextJobFromQueue();
+        } else {
+            jobQueue.push(jobData);
+        }
+    } else if (type === 'scheduler') {
+        if (!cronExp) throw new JobError(400, 'cronExp required for scheduler jobs');
         const cronExpString = utils.toCronExpression(cronExp);
+
         job.executor = scheduleJob(cronExpString, async () => {
             try {
-                console.log(`Scheduled job(${title}) running at:`, new Date().toISOString());
-                await createJob({ type: 'thread', title: `Child Process of Scheduled Job ${title}`, description:'', parentId: jobid, serviceModule, method, payload });
+                console.log(`Scheduler job "${title}" triggered at ${new Date().toISOString()}`);
+                await createJob({
+                    type: 'thread',
+                    title: `Child of scheduled job: ${title}`,
+                    description: '',
+                    parentId: jobid,
+                    serviceModule,
+                    method,
+                    payload
+                });
             } catch (error) {
-                console.error(`Scheduler Error in ${title}:`, error);
-                try {
-                    cancelJob(jobid);
-                    console.log(`Scheduled job(${title}) cancelled due to error at:`, new Date().toISOString());
-                } catch (error) {
-                    console.log(`Failed To Cancel Scheduled Job with id: ${jobid}`)
-                }
+                console.error(`Scheduler job "${title}" error:`, error);
+                cancelJob(jobid);
             }
         });
+        job.response.message = 'Scheduler is Running';
     } else {
-        throw new JobError(202, 'Provide valid job type');
+        throw new JobError(400, 'Invalid job type');
     }
+
     jobMap.set(jobid, job);
     return jobid;
 };
 
-/**
- * 
- * @param {string} jobid - Provide Job Id to get Job details
- * @returns {Job} job - Returns Job;
- */
-const getJob = (jobid) => {
-    if (!jobid) throw new JobError(400, 'Provide Job Id');
-    if (!jobMap.has(String(jobid))) {
-        throw new JobError(404, 'No Job Found');
-    }
-    return jobMap.get(String(jobid));
-};
-
-/**
- * 
- * @returns {ApiResponseEntity} jobdetls - Return all running job details
- */
-const getAllJobs = () => {
-    const activeJobs = Array.from(jobMap.entries()).map(([jobid, job]) => ({
-      jobid,
-      type: job.type,
-      title: job.title,
-      description: job.description,
-      children: Array.from(jobMap.entries())
-        .filter(([_, jjob]) => jjob.parentId === jobid)
-        .map(([childId, childJob]) => ({
-          jobid: childId,
-          type: childJob.type,
-          title: childJob.title,
-          description: childJob.description
-        }))
-    }));
-    let response = new ApiResponseEntity({
-    status: 200,
-    message: activeJobs.length ? 'Successfully Fetched All Active Jobs' : 'No Active Jobs Found',
-    data: activeJobs
-  });
-  return response;
-};
-
-/**
- * 
- * @param {String} jobid - Job id to cancel associated job 
- * @returns {ApiResponseEntity}
+/** Cancel a job (thread or scheduler)
+ * @param {number} jobid - jobid of associated job
+ * @throws {JobError} When job not found
+ * @returns {ApiResponseEntity} Returns a response
  */
 const cancelJob = (jobid) => {
-    const job = getJob(jobid);
-    if (!job) throw new JobError(404, 'Job Not Found');
+    const job = jobMap.get(jobid);
+    if (!job) throw new JobError(404, 'Job not found');
+
     if (job.type === 'thread') {
-        if (!job.executor || !(job.executor instanceof Worker)) throw new JobError(404, 'Worker Not Found');
-        job.executor.terminate();
+        if (job.executor) {
+            job.executor.terminate();
+            activeWorkers = Math.max(0, activeWorkers - 1);
+        } else {
+            // remove from queue
+            const idx = jobQueue.findIndex(j => j.jobid === jobid);
+            if (idx > -1) jobQueue.splice(idx, 1);
+        }
     } else if (job.type === 'scheduler') {
-        job.executor.cancel();
-    } else {
-        throw new JobError(404, 'Job has not a valid type');
+        if (job.executor) job.executor.cancel();
     }
+
     job.response.status = 499;
-    job.response.message = 'Job is cancelled';
+    job.response.message = 'Job cancelled';
     job.executor = null;
+
+    return new ApiResponseEntity({ status: 499, message: 'Job cancelled successfully' });
+};
+
+/** Get job details 
+ * @param {number} jobid - Job id of associate job
+ * @throws {JobError} - When job not found
+ * @returns {ApiResponseEntity} Returns a response with job detail with it's children
+*/
+const getJobDetail = (jobid) => {
+    const job = jobMap.get(jobid);
+    if (!job) throw new JobError(404, 'Job not found');
+
     return new ApiResponseEntity({
-        status: 499,
-        message: 'Job is cancelled successfully'
+        status: 200,
+        message: 'Job detail fetched',
+        data: {
+            jobid,
+            type: job.type,
+            title: job.title,
+            description: job.description,
+            children: Array.from(jobMap)
+                .filter(([_, childJob]) => childJob.parentId >= 0 && childJob.parentId === jobid)
+                .map(([childJobId, childJob]) => 
+                    ({
+                        jobid: childJobId,
+                        type: childJob.type,
+                        title: childJob.title,
+                        description: childJob.description,
+                    })
+                )
+        }
     });
 };
 
-export {
-    createJob,
-    getJob,
-    getAllJobs,
-    cancelJob
+/** Get all active jobs 
+ * @returns {ApiResponseEntity} Returns a response with all jobs details with it's children
+*/
+const getAllJobsDetail = () => {
+    const jobs = Array.from(jobMap.entries()).map(([id, job]) => ({
+        jobid: id,
+        type: job.type,
+        title: job.title,
+        description: job.description,
+        children: Array.from(jobMap)
+            .filter(([_, childJob]) => childJob.parentId >= 0 && childJob.parentId === id)
+            .map(([childJobId, childJob]) => 
+                ({
+                    jobid: childJobId,
+                    type: childJob.type,
+                    title: childJob.title,
+                    description: childJob.description,
+                })
+            )
+    }));
+
+    return new ApiResponseEntity({
+        status: 200,
+        message: jobs.length ? 'Fetched all active jobs' : 'No active jobs',
+        data: jobs
+    });
+};
+
+/** Get job response
+ * @param {number} jobid - Job id of associate job
+ * @returns {ApiResponseEntity|null} response - job Response
+*/
+const getJobResponse = (jobid) => {
+    const job = jobMap.get(jobid);
+    if (!job) throw new JobError(404, 'Job not found');
+    return job.response;
 }
 
-// april 24 to 25th march 2025
+export {
+    createJob,
+    cancelJob,
+    getJobDetail,
+    getAllJobsDetail,
+    getJobResponse
+};
