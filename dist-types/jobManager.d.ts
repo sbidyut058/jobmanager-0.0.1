@@ -1,3 +1,11 @@
+export type cronExpObj = {
+    second?: number | undefined;
+    minute: number;
+    hour: number;
+    dayOfMonth: number;
+    month: number;
+    dayOfWeek: number;
+};
 /**
  * Create a job (thread or scheduler)
  * @param {Object} props
@@ -8,7 +16,7 @@
  * @param {string} props.title
  * @param {string} [props.description]
  * @param {string} [props.parentId]
- * @param {Object} [props.cronExp] - Only for scheduler
+ * @param {cronExpObj} [props.cronExp] - Only for scheduler
  * @returns {Promise<string>} jobid
  */
 export function createJob(props: {
@@ -19,7 +27,7 @@ export function createJob(props: {
     title: string;
     description?: string | undefined;
     parentId?: string | undefined;
-    cronExp?: Object | undefined;
+    cronExp?: cronExpObj | undefined;
 }): Promise<string>;
 /** Cancel a job (thread or scheduler)
  * @param {number} jobid - jobid of associated job

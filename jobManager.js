@@ -12,6 +12,16 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const workerPath = path.resolve(__dirname, './worker.js');
 
+/**
+ * @typedef {Object} cronExpObj
+ * @property {number} [second]
+ * @property {number} minute
+ * @property {number} hour
+ * @property {number} dayOfMonth
+ * @property {number} month
+ * @property {number} dayOfWeek
+ */
+
 /** Map of jobId -> Job 
  * @type {Map<number, Job>}
 */
@@ -40,7 +50,7 @@ const runNextJobFromQueue = async () => {
     const { jobid, serviceModule, method, payload, title } = nextJob;
 
     const worker = new Worker(workerPath, {
-        workerData: { serviceModule, jobid, method, payload: JSON.parse(JSON.stringify(payload)) }
+        workerData: { serviceModule, jobid, method, payload: JSON.parse(JSON.stringify(payload ?? {})) }
     });
 
     nextJob.job.executor = worker;
@@ -69,7 +79,7 @@ const runNextJobFromQueue = async () => {
  * @param {string} props.title
  * @param {string} [props.description]
  * @param {string} [props.parentId]
- * @param {Object} [props.cronExp] - Only for scheduler
+ * @param {cronExpObj} [props.cronExp] - Only for scheduler
  * @returns {Promise<string>} jobid
  */
 const createJob = async (props) => {

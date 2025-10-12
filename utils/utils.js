@@ -34,8 +34,8 @@ const processResponseEntity = (res, entity) => {
  * @returns {string} Cron expression string.
  */
 function toCronExpression(obj) {
-  const { minute, hour, dayOfMonth, month, dayOfWeek } = obj;
-  return `${minute ?? '*'} ${hour ?? '*'} ${dayOfMonth ?? '*'} ${month ?? '*'} ${dayOfWeek ?? '*'}`;
+  const { second, minute, hour, dayOfMonth, month, dayOfWeek } = obj;
+  return `${second ?? '*'} ${minute ?? '*'} ${hour ?? '*'} ${dayOfMonth ?? '*'} ${month ?? '*'} ${dayOfWeek ?? '*'}`;
 }
 
 export default {
