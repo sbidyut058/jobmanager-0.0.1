@@ -16,6 +16,18 @@ declare class JobController {
      */
     cancelJob: (req: any, res: any) => Promise<Object>;
     /**
+     * Clear job data by jobid
+     * @param {import('express').Request} req - Express request object
+     * @param {import('express').Response} res - Express response object
+     */
+    clearJobData: (req: any, res: any) => Promise<Object>;
+    /**
+     * Clear job data for all jobs
+     * @param {import('express').Request} req - Express request object
+     * @param {import('express').Response} res - Express response object
+     */
+    clearAllJobData: (req: any, res: any) => Promise<Object>;
+    /**
      * Get details of all active jobs
      * @param {import('express').Request} req - Express request object
      * @param {import('express').Response} res - Express response object

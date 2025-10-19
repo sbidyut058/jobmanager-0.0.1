@@ -13,6 +13,7 @@ import BaseObject from './BaseObject.js';
  * @property {string} [parentId] - Optional parent job ID
  * @property {string} title - Job title
  * @property {string} [description] - Optional description
+ * @property {number} [status] - Job status code
  * @property {ApiResponseEntity} [response] - Response object for job result
  * @property {Worker|ScheduleJob} [executor] - Worker thread or scheduler job
  */
@@ -30,9 +31,10 @@ class Job extends BaseObject {
   constructor(props) {
     super(props, {
       type: { type: "string", validValues: ["thread", "scheduler"], nullable: false },
-      parentId: { type: "string", nullable: true },
+      parentId: { type: "number", nullable: true },
       title: { type: "string", nullable: false },
       description: { type: "string", nullable: true },
+      status: { type: "number", nullable: true },
       response: { type: "object", instance: ApiResponseEntity, nullable: true },
       executor: { type: "object", instance: [Worker, ScheduleJob], nullable: true }
     });
@@ -40,7 +42,7 @@ class Job extends BaseObject {
     /** @type {"thread" | "scheduler"} */
     this.type;
 
-    /** @type {string | null} */
+    /** @type {number | null} */
     this.parentId;
 
     /** @type {string} */
@@ -48,6 +50,9 @@ class Job extends BaseObject {
 
     /** @type {string | null} */
     this.description;
+
+    /** @type {number | null} */
+    this.status;
 
     /** @type {ApiResponseEntity | null} */
     this.response;

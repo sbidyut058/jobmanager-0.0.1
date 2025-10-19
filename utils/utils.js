@@ -35,12 +35,28 @@ const processResponseEntity = (res, entity) => {
  */
 function toCronExpression(obj) {
   const { second, minute, hour, dayOfMonth, month, dayOfWeek } = obj;
-  return `${second ?? '*'} ${minute ?? '*'} ${hour ?? '*'} ${dayOfMonth ?? '*'} ${month ?? '*'} ${dayOfWeek ?? '*'}`;
+  return `${minute ?? '*'} ${hour ?? '*'} ${dayOfMonth ?? '*'} ${month ?? '*'} ${dayOfWeek ?? '*'}`;
+}
+
+/**
+ * Maps HTTP-like status codes to job status strings.
+ * @param {number} code - Status code.
+ * @returns {string} Job status string.
+ */
+function jobStatusFromCode(code) {
+    const statusMap = {
+        200: 'Completed',
+        202: 'In Progress',
+        499: 'Cancelled',
+        500: 'Failed'
+    };
+    return statusMap[code] || 'Unknown';
 }
 
 export default {
     sleep,
     asyncHandler,
     toCronExpression,
-    processResponseEntity
+    processResponseEntity,
+    jobStatusFromCode
 }

@@ -3,6 +3,7 @@ declare namespace _default {
     export { asyncHandler };
     export { toCronExpression };
     export { processResponseEntity };
+    export { jobStatusFromCode };
 }
 export default _default;
 declare function sleep(ms: any): Promise<any>;
@@ -20,4 +21,10 @@ declare function toCronExpression(obj: import("../jobManager.js").cronExpObj): s
  * @returns {Object} res - Response object
  */
 declare function processResponseEntity(res: Object, entity: ApiResponseEntity): Object;
+/**
+ * Maps HTTP-like status codes to job status strings.
+ * @param {number} code - Status code.
+ * @returns {string} Job status string.
+ */
+declare function jobStatusFromCode(code: number): string;
 import ApiResponseEntity from "../models/ApiResponseEntity.js";

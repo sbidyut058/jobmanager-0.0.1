@@ -1,5 +1,5 @@
 import utils from "../utils/utils.js";
-import { cancelJob, getAllJobsDetail, getJobDetail, getJobResponse as fetchJobResponse } from "../jobManager.js";
+import { cancelJob, getAllJobsDetail, getJobDetail, getJobResponse as fetchJobResponse, clearJobDataByJobId, clearJobData } from "../jobManager.js";
 
 /**
  * Controller to handle Job related APIs
@@ -22,8 +22,27 @@ class JobController {
      * @param {import('express').Response} res - Express response object
      */
     cancelJob = async (req, res) => {
-        const { jobid } = req.body;
+        const { jobid } = req.query;
         return utils.processResponseEntity(res, cancelJob(Number(jobid)));
+    }
+
+    /**
+     * Clear job data by jobid
+     * @param {import('express').Request} req - Express request object
+     * @param {import('express').Response} res - Express response object
+     */
+    clearJobData = async (req, res) => {
+        const { jobid } = req.query;
+        return utils.processResponseEntity(res, clearJobDataByJobId(Number(jobid)));
+    }
+
+    /**
+     * Clear job data for all jobs
+     * @param {import('express').Request} req - Express request object
+     * @param {import('express').Response} res - Express response object
+     */
+    clearAllJobData = async (req, res) => {
+        return utils.processResponseEntity(res, clearJobData());
     }
 
     /**

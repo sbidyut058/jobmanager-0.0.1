@@ -18,6 +18,10 @@ export type JobProps = {
      */
     description?: string | undefined;
     /**
+     * - Job status code
+     */
+    status?: number | undefined;
+    /**
      * - Response object for job result
      */
     response?: ApiResponseEntity | undefined;
@@ -35,6 +39,7 @@ export type JobProps = {
  * @property {string} [parentId] - Optional parent job ID
  * @property {string} title - Job title
  * @property {string} [description] - Optional description
+ * @property {number} [status] - Job status code
  * @property {ApiResponseEntity} [response] - Response object for job result
  * @property {Worker|ScheduleJob} [executor] - Worker thread or scheduler job
  */
@@ -50,12 +55,14 @@ declare class Job extends BaseObject {
     constructor(props: JobProps);
     /** @type {"thread" | "scheduler"} */
     type: "thread" | "scheduler";
-    /** @type {string | null} */
-    parentId: string | null;
+    /** @type {number | null} */
+    parentId: number | null;
     /** @type {string} */
     title: string;
     /** @type {string | null} */
     description: string | null;
+    /** @type {number | null} */
+    status: number | null;
     /** @type {ApiResponseEntity | null} */
     response: ApiResponseEntity | null;
     /** @type {Worker | ScheduleJob | null} */
