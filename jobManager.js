@@ -113,34 +113,41 @@ const getJob = (jobid) => {
  */
 const cancelJob = (jobid) => {
     const job = getJob(jobid);
+    let resMsg = '';
 
     if (job.type === 'thread') {
         if (job.executor) {
             jobQueue.terminateByJobId(jobid);
+            resMsg = `Job[${jobid}] Terminated Successfully`;
         } else {
             JobQueue.removeByJobId(jobid);
+            resMsg = `Job[${jobid}] removed from queue Successfully`;
         }
     } else if (job.type === 'scheduler') {
-        if (job.executor) job.executor.cancel();
-        Array.from(jobMap)
-                .filter(([_, childJob]) => childJob.parentId >= 0 && childJob.parentId === jobid)
-                .forEach(([childJobId, childJob]) => {
-                    cancelJob(childJobId);
-                });
+        if (job.executor) {
+            job.executor.cancel();
+            Array.from(jobMap)
+                    .filter(([_, childJob]) => childJob.parentId >= 0 && childJob.parentId === jobid)
+                    .forEach(([childJobId, childJob]) => {
+                        cancelJob(childJobId);
+                    });
+            resMsg = `Scheduler Job[${jobid}] Cancelled Successfully`;
+        }
     }
+    resMsg = resMsg ?? 'Job cancelled successfully';
 
     job.response.status = 499;
-    job.response.message = 'Job cancelled';
+    job.response.message = resMsg;
     job.executor = null;
-
-    return new ApiResponseEntity({ status: 499, message: 'Job cancelled successfully' });
+    console.log(resMsg);
+    return new ApiResponseEntity({ status: 499, message: resMsg });
 };
 
 
 /** Clear jobs that are not in progress or finished or not in queue */
 const clearJobData = () => {
     for (const [jobid, job] of jobMap) {
-        if (job.status === 200 || job.status === 499 || !JobQueue.hasJobInQueue(jobid)) {
+        if (job.status !== 202 && !JobQueue.hasJobInQueue(jobid)) {
             jobMap.delete(jobid);
         }
     }
@@ -216,7 +223,7 @@ const getAllJobsDetail = () => {
 
     return new ApiResponseEntity({
         status: 200,
-        message: jobs.length ? 'Fetched all active jobs' : 'No active jobs',
+        message: jobs.length ? 'Fetched all jobs details' : 'No jobs are present',
         data: jobs
     });
 };
